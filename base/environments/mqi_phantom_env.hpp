@@ -401,6 +401,7 @@ public:
         free  = 0;
         total = 0;
         mc::transport_particles_patient<R><<<threads[1], threads[0]>>>(
+          tx_session_->physics_data_manager_->get_texture_object(),
           worker_threads, mc::mc_world, mc::mc_vertices, h1, d_tracked_particles);
         cudaMemGetInfo(&free, &total);
         printf("After run total memory %lu MB Free memory %lu MB\n",

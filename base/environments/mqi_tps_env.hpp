@@ -1249,6 +1249,7 @@ public:
         printf("Starting transportation call.. \n");
         printf("Printing simulation specification.. : Histories per batch --> %d\n", histories_per_batch);
         mc::transport_particles_patient<R><<<n_blocks, n_threads>>>(
+          tx->physics_data_manager_->get_texture_object(),
           worker_threads, mc::mc_world, mc::mc_vertices, histories_in_batch, d_tracked_particles);
         cudaDeviceSynchronize();
         check_cuda_last_error("(transport particle table)");
@@ -1270,6 +1271,7 @@ public:
         initialize_threads(worker_threads, n_threads, this->master_seed);
         printf("Thread initialization complete!\n");
         mc::transport_particles_patient<R>(
+          tx->physics_data_manager_->get_texture_object(),
           worker_threads, mc::mc_world, mc::mc_vertices, histories_in_batch, tracked_particles);
 #endif
     }   //run_simulation

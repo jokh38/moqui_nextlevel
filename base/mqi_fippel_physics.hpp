@@ -26,33 +26,23 @@ public:
     mqi::po_inelastic_tabulated<R> po_i;
 
     CUDA_HOST_DEVICE
-    fippel_physics() :
-        p_ion(0.1,
-              299.6,
-              0.5,
-              mqi::cs_p_ion_table,
-              mqi::restricted_stopping_power_table,
-              mqi::range_steps),
-        pp_e(0.5, 300.0, 0.5, mqi::cs_pp_e_g4_table), po_e(0.5, 300.0, 0.5, mqi::cs_po_e_g4_table),
-        po_i(0.5, 300.0, 0.5, mqi::cs_po_i_g4_table)
-
+    fippel_physics(cudaTextureObject_t tex) :
+        p_ion(0.1, 299.6, 0.5, tex),
+        pp_e(0.5, 300.0, 0.5, tex),
+        po_e(0.5, 300.0, 0.5, tex),
+        po_i(0.5, 300.0, 0.5, tex)
     {
         ;
     }
 
     ///<
     CUDA_HOST_DEVICE
-    fippel_physics(R e_cut) :
-        physics_list<R>::Te_cut(e_cut), p_ion(0.1,
-                                              299.6,
-                                              0.5,
-                                              mqi::cs_p_ion_table,
-                                              mqi::restricted_stopping_power_table,
-                                              mqi::range_steps),
-
-        pp_e(0.5, 300.0, 0.5, mqi::cs_pp_e_g4_table), po_e(0.5, 300.0, 0.5, mqi::cs_po_e_g4_table),
-        po_i(0.5, 300.0, 0.5, mqi::cs_po_i_g4_table)
-
+    fippel_physics(R e_cut, cudaTextureObject_t tex) :
+        physics_list<R>::Te_cut(e_cut),
+        p_ion(0.1, 299.6, 0.5, tex),
+        pp_e(0.5, 300.0, 0.5, tex),
+        po_e(0.5, 300.0, 0.5, tex),
+        po_i(0.5, 300.0, 0.5, tex)
     {
         ;
     }
@@ -72,7 +62,8 @@ public:
              const R&          rho_mass,
              material_t<R>&    mat,
              const R&          distance_to_boundary,
-             bool              score_local_deposit) {
+             bool              score_local_deposit,
+             cudaTextureObject_t tex) {
 
         if (trk.vtx0.ke < this->Tp_cut) {
             if (trk.vtx0.ke < 0) trk.vtx0.ke = 0;
