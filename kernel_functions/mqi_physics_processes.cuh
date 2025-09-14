@@ -4,6 +4,7 @@
 #include <moqui/base/mqi_track.hpp>
 #include <moqui/base/mqi_physics_constants.hpp>
 #include <moqui/base/mqi_error_check.hpp>
+#include <moqui/base/mqi_math.hpp> // For mqi::PI
 
 namespace mc
 {
@@ -60,9 +61,6 @@ sample_discrete_interaction(cudaTextureObject_t tex,
     constexpr float INELASTIC_XS_LAYER = 2.0f;
 
     // Fetch cross-sections from the 3D texture
-    // u (coord.x) = energy, v (coord.y) = material index, w (coord.z) = physics process
-    // The plan is ambiguous about normalization, but existing code uses energy directly.
-    // We assume texture coordinates are set up accordingly.
     const R elastic_xs   = tex3D<R>(tex, energy, static_cast<R>(material_idx), ELASTIC_XS_LAYER);
     const R inelastic_xs = tex3D<R>(tex, energy, static_cast<R>(material_idx), INELASTIC_XS_LAYER);
 
@@ -85,6 +83,101 @@ sample_discrete_interaction(cudaTextureObject_t tex,
         return INELASTIC;
     }
 }
+
+/// \brief Pushes a secondary particle onto the shared memory stack.
+/// \tparam R Data type (e.g., float or double).
+template<typename R>
+__device__ void
+push_to_stack(mqi::track_t<R>*  secondary_stack,
+              int&              stack_top,
+              const int         stack_size,
+              const mqi::track_t<R>& new_track)
+{
+    // Use atomicAdd to get a unique index on the stack.
+    // This is the 'push' operation.
+    int index = atomicAdd(&stack_top, 1);
+    if (index < stack_size) {
+        secondary_stack[index] = new_track;
+    }
+    // If index >= stack_size, the stack is full. The particle is lost.
+    // A more robust implementation might handle this case.
+}
+
+/// \brief Pops a particle from the shared memory stack for the current thread to process.
+/// \tparam R Data type (e.g., float or double).
+template<typename R>
+__device__ bool
+pop_from_stack(mqi::track_t<R>*  secondary_stack,
+               int&              stack_top,
+               mqi::track_t<R>&  current_track)
+{
+    // Atomically decrement the stack counter. The returned value is the count *before* decrementing.
+    // The index of the item to pop is `count - 1`.
+    int index = atomicSub(&stack_top, 1) - 1;
+
+    if (index >= 0) {
+        // If the index is valid, a particle was successfully reserved.
+        // Copy the track data to the thread's local memory.
+        current_track = secondary_stack[index];
+        return true;
+    } else {
+        // The stack was empty. The atomicSub made the counter negative. Reset it to 0.
+        atomicExch(&stack_top, 0);
+        return false; // No particle was popped.
+    }
+}
+
+/// \brief Generates a random isotropic direction vector.
+/// \tparam R Data type (e.g., float or double).
+template<typename R>
+__device__ mqi::vec3<R>
+get_isotropic_direction(mqi::mqi_rng* rng)
+{
+    R z = 2.0 * curand_uniform(rng) - 1.0;
+    R phi = 2.0 * mqi::PI * curand_uniform(rng);
+    R r = sqrt(1.0 - z*z);
+    R x = r * cos(phi);
+    R y = r * sin(phi);
+    return mqi::vec3<R>(x, y, z);
+}
+
+
+/// \brief Implements the final state model for an inelastic reaction.
+/// \tparam R Data type (e.g., float or double).
+template<typename R>
+__device__ void
+execute_inelastic_reaction(mqi::track_t<R>*  primary_track,
+                           mqi::track_t<R>*  secondary_stack,
+                           int&              stack_top,
+                           const int         stack_size,
+                           mqi::mqi_rng*     rng)
+{
+    // 1. The primary proton is stopped.
+    primary_track->stop();
+
+    // 2. Create a new secondary proton.
+    mqi::track_t<R> secondary;
+
+    // 3. The secondary's starting vertex is the primary's interaction point.
+    secondary.vtx0 = primary_track->vtx1;
+    secondary.vtx1 = primary_track->vtx1; // vtx0 and vtx1 are the same initially.
+
+    // 4. The secondary's energy is sampled from a simple distribution.
+    secondary.vtx1.ke = primary_track->vtx1.ke * curand_uniform(rng);
+
+    // 5. The secondary's direction is isotropic.
+    secondary.vtx1.dir = get_isotropic_direction<R>(rng);
+
+    // 6. Set other properties for the secondary.
+    secondary.particle = mqi::PROTON;
+    secondary.primary = false;
+    secondary.status = mqi::CREATED;
+    secondary.c_node = primary_track->c_node; // Assume it starts in the same node.
+
+    // 7. Push the new secondary to the shared stack.
+    push_to_stack(secondary_stack, stack_top, stack_size, secondary);
+}
+
 
 } // namespace mc
 
