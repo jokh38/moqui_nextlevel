@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(env LANGUAGES CXX CUDA)
 
+# Add the subdirectory for the Geant4 data parser utility
+add_subdirectory(utils/g4_data_parser)
+
 # RTX A5000 = sm_86
 set(CMAKE_CUDA_ARCHITECTURES 86)
 # 런타임을 동적 링크로 (ldd에 libcudart가 보이도록)
