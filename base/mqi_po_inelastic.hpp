@@ -120,7 +120,7 @@ template<typename R>
 class po_inelastic_tabulated : public po_inelastic<R>
 {
 public:
-    const R* cs_table;
+    cudaTextureObject_t tex_;
     R        Ek_min;   //= 0.5   ;
     R        Ek_max;   //= 300.0 ;
     R        dEk;      //= 0.5   ;
@@ -134,7 +134,7 @@ public:
 
 public:
     CUDA_HOST_DEVICE
-    po_inelastic_tabulated(R m, R M, R s, const R* p) : cs_table(p) {
+    po_inelastic_tabulated(R m, R M, R s, cudaTextureObject_t tex) : tex_(tex) {
         Ek_min    = m;
         Ek_max    = M;
         dEk       = s;
@@ -148,7 +148,6 @@ public:
 
     CUDA_HOST_DEVICE
     ~po_inelastic_tabulated() {
-        cs_table = nullptr;
     }
 
     CUDA_HOST_DEVICE
@@ -157,11 +156,8 @@ public:
         R cs = 0;
 
         if (rel.Ek >= Ek_min && rel.Ek <= Ek_max) {
-            uint16_t idx0 = uint16_t((rel.Ek - Ek_min) / dEk);   //0 - 598
-            uint16_t idx1 = idx0 + 1;
-            R        x0   = Ek_min + idx0 * dEk;
-            R        x1   = x0 + 0.5;
-            cs            = mqi::intpl1d<R>(rel.Ek, x0, x1, cs_table[idx0], cs_table[idx1]);
+            float u = (rel.Ek - Ek_min) / dEk + 0.5f;
+            cs = tex2D<float>(tex_, u, 4.5f);
         }
         cs *= mat.rho_mass;
         return cs;

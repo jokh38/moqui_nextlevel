@@ -18,6 +18,7 @@
 #include <moqui/treatment_machines/mqi_treatment_machine_smc_gtr2.hpp> // SMC PBS dedicated nozzle
 #include <moqui/treatment_machines/mqi_treatment_machine_smc_gtr1.hpp> // SMC PBS multi-purpose nozzle
 #include <moqui/base/mqi_utils.hpp>
+#include <moqui/base/mqi_physics_data.hpp>
 
 namespace mqi
 {
@@ -45,6 +46,9 @@ protected:
 
     ///< top level DICOM dataset, either RTIP or RTIBTR
     mqi::dataset* mqi_ds_ = nullptr;
+
+    ///< Physics data manager
+    std::unique_ptr<mqi::physics_data_manager> physics_data_manager_;
 
 public:
     mqi::patient_material_t<T> material_;
@@ -123,6 +127,7 @@ public:
         if (!this->create_machine(machine_name_, mc_code, gantryNum)) {
             std::runtime_error("No MC machine is registered for " + machine_name_);
         }
+        physics_data_manager_ = std::make_unique<mqi::physics_data_manager>();
     }
 
     /// Creates mqi::machine and return true for successful creation or false.

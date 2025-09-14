@@ -86,7 +86,8 @@ insert_hashtable(mqi::key_value*        hashtable,
 
 template<typename R>
 CUDA_GLOBAL void
-transport_particles_patient(mqi::thrd_t*      threads,
+transport_particles_patient(cudaTextureObject_t tex,
+                            mqi::thrd_t*      threads,
                             mqi::node_t<R>*   world,
                             mqi::vertex_t<R>* vertices,
                             const uint32_t    n_vtx,
@@ -106,7 +107,7 @@ transport_particles_patient(mqi::thrd_t*      threads,
     const mqi::vec2<uint32_t> h_range    = mqi::start_and_length(total_threads, n_vtx, thread_id);
     mqi::mqi_rng*             thread_rng = &threads[thread_id].rnd_generator;
     R                         process;
-    mqi::fippel_physics<R>    fippel;
+    mqi::fippel_physics<R>    fippel(tex);
     mqi::h2o_t<R>             water;   // 1e-3 g/mm^3
     uint32_t                  spot_ind;
     uint32_t                  c_ind;
@@ -192,7 +193,8 @@ transport_particles_patient(mqi::thrd_t*      threads,
                                     rho_mass,
                                     water,
                                     track.its.dist,
-                                    score_local_deposit);
+                                    score_local_deposit,
+                                    tex);
 #endif
                     if (track.its.dist < 0) break;
                     for (uint8_t s = 0; s < nb_of_scorers; ++s) {
@@ -234,7 +236,8 @@ transport_particles_patient(mqi::thrd_t*      threads,
 
 template<typename R>
 CUDA_GLOBAL void
-transport_particles_patient_seed(mqi::thrd_t*      threads,
+transport_particles_patient_seed(cudaTextureObject_t tex,
+                                 mqi::thrd_t*      threads,
                                  mqi::node_t<R>*   world,
                                  mqi::vertex_t<R>* vertices,
                                  const uint32_t    n_vtx,
@@ -256,7 +259,7 @@ transport_particles_patient_seed(mqi::thrd_t*      threads,
     const mqi::vec2<uint32_t> h_range    = mqi::start_and_length(total_threads, n_vtx, thread_id);
     mqi::mqi_rng*             thread_rng = &threads[thread_id].rnd_generator;
     R                         process;
-    mqi::fippel_physics<R>    fippel;
+    mqi::fippel_physics<R>    fippel(tex);
     mqi::h2o_t<R>             water;   //1e-3 g/mm^3
     uint32_t                  spot_ind;
     uint32_t                  c_ind;
@@ -345,7 +348,8 @@ transport_particles_patient_seed(mqi::thrd_t*      threads,
                                     rho_mass,
                                     water,
                                     track.its.dist,
-                                    score_local_deposit);
+                                    score_local_deposit,
+                                    tex);
 #endif
                     if (track.its.dist < 0) break;
                     for (uint8_t s = 0; s < nb_of_scorers; ++s) {
