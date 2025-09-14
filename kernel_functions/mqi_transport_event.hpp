@@ -36,108 +36,103 @@ transport_event_by_event_kernel(cudaTextureObject_t tex,
     mqi::mqi_rng* thread_rng = &threads[thread_id].rnd_generator;
 
     // Shared memory for secondary particle stack
-    __shared__ mqi::track_t<R> secondary_stack[256];
+    constexpr int STACK_SIZE = 256;
+    __shared__ mqi::track_t<R> secondary_stack[STACK_SIZE];
     __shared__ int stack_top;
     if (threadIdx.x == 0) {
-        stack_top = -1;
+        stack_top = 0;
     }
     __syncthreads();
 
     for (uint32_t i = h_range.x; i < h_range.x + h_range.y; ++i) {
-        mqi::track_t<R>* primary = &tracks[i];
-        mqi::track_stack_t<R> local_stack;
-        local_stack.push_secondary(*primary);
+        mqi::track_t<R> current_track = tracks[i];
 
-        while (!local_stack.is_empty()) {
-            mqi::track_t<R> track = local_stack.pop();
-
-            while (!track.is_stopped()) {
+        do {
+            while (!current_track.is_stopped()) {
                 // Find current node and geometry
-                // This simplified loop assumes the particle is in one of the children of the world.
-                // A more robust geometry navigator would be needed for complex cases.
                 bool in_geometry = false;
                 for (uint32_t c_ind = 0; c_ind < world->n_children; c_ind++) {
                      mqi::grid3d<mqi::density_t, R>& c_geo = *(world->children[c_ind]->geo);
-                     track.c_node = world->children[c_ind];
+                     current_track.c_node = world->children[c_ind];
 
                      // Transform particle to geometry's local coordinates
-                     mqi::vec3<R> original_pos = track.vtx0.pos;
-                     mqi::vec3<R> original_dir = track.vtx0.dir;
-                     track.vtx0.pos = c_geo.rotation_matrix_inv * (track.vtx0.pos - c_geo.translation_vector);
-                     track.vtx0.dir = c_geo.rotation_matrix_inv * track.vtx0.dir;
-                     track.vtx0.dir.normalize();
-                     track.vtx1 = track.vtx0;
+                     mqi::vec3<R> original_pos = current_track.vtx0.pos;
+                     mqi::vec3<R> original_dir = current_track.vtx0.dir;
+                     current_track.vtx0.pos = c_geo.rotation_matrix_inv * (current_track.vtx0.pos - c_geo.translation_vector);
+                     current_track.vtx0.dir = c_geo.rotation_matrix_inv * current_track.vtx0.dir;
+                     current_track.vtx0.dir.normalize();
+                     current_track.vtx1 = current_track.vtx0;
 
-                     if (c_geo.is_inside(track.vtx0.pos)) {
+                     if (c_geo.is_inside(current_track.vtx0.pos)) {
                         in_geometry = true;
-                        mqi::cnb_t cnb = c_geo.ijk2cnb(c_geo.index(track.vtx0.pos));
+                        mqi::cnb_t cnb = c_geo.ijk2cnb(c_geo.index(current_track.vtx0.pos));
                         R rho_mass = c_geo[cnb];
 
-                        // Woodcock Tracking: sample distance to next potential interaction site
+                        // Woodcock Tracking
                         R random_val = curand_uniform(thread_rng);
                         R dist_to_interaction = -log(random_val) / max_sigma;
 
-                        // Find distance to the boundary of the current geometry voxel
-                        mqi::intersect_t<R> its = c_geo.intersect(track.vtx0.pos, track.vtx0.dir);
+                        // Find distance to boundary
+                        mqi::intersect_t<R> its = c_geo.intersect(current_track.vtx0.pos, current_track.vtx0.dir);
                         R dist_to_boundary = its.dist;
 
-                        // The step length is the minimum of the two distances
                         R step_length = min(dist_to_interaction, dist_to_boundary);
-                        track.update_post_vertex_position(step_length);
+                        current_track.update_post_vertex_position(step_length);
 
-                        // Apply continuous processes (energy loss) over the step
-                        mc::apply_continuous_processes(&track, step_length, rho_mass, tex, c_ind);
+                        // Apply continuous processes
+                        mc::apply_continuous_processes(&current_track, step_length, rho_mass, tex, c_ind);
 
                         // Scoring
-                        for (uint8_t s = 0; s < track.c_node->n_scorers; ++s) {
-                             if (track.c_node->scorers[s]->roi_->idx(cnb) > 0) {
+                        for (uint8_t s = 0; s < current_track.c_node->n_scorers; ++s) {
+                             if (current_track.c_node->scorers[s]->roi_->idx(cnb) > 0) {
                                 insert_hashtable<R>(
-                                  track.c_node->scorers[s]->data_,
+                                  current_track.c_node->scorers[s]->data_,
                                   cnb,
                                   scorer_offset_vector ? scorer_offset_vector[i] : mqi::empty_pair,
-                                  track.dE,
+                                  current_track.dE,
                                   c_geo.get_nxyz().x * c_geo.get_nxyz().y * c_geo.get_nxyz().z,
-                                  track.c_node->scorers[s]->max_capacity_);
+                                  current_track.c_node->scorers[s]->max_capacity_);
                             }
                         }
 
-                        // If the step ended on an interaction site, sample the interaction
+                        // Sample discrete interaction
                         if (dist_to_interaction < dist_to_boundary) {
                             mc::interaction_type_t interaction = mc::sample_discrete_interaction(
-                                tex, track.vtx1.ke, c_ind, max_sigma, thread_rng);
+                                tex, current_track.vtx1.ke, c_ind, max_sigma, thread_rng);
 
                             switch (interaction) {
                                 case mc::ELASTIC:
-                                    // Final state model for elastic scattering would be called here.
-                                    // For now, stop the particle as a placeholder.
-                                    track.stop();
+                                    // Placeholder
+                                    current_track.stop();
                                     break;
                                 case mc::INELASTIC:
-                                    // Final state model for inelastic reaction would be called here.
-                                    // For now, stop the particle as a placeholder.
-                                    track.stop();
+                                    mc::execute_inelastic_reaction(&current_track,
+                                                                   secondary_stack,
+                                                                   stack_top,
+                                                                   STACK_SIZE,
+                                                                   thread_rng);
                                     break;
                                 case mc::NULL_COLLISION:
-                                    // Do nothing, continue tracking
+                                    // Continue tracking
                                     break;
                             }
                         }
 
-                        track.move();
+                        current_track.move();
                      }
 
                      // Transform back to world coordinates
-                     track.vtx0.pos = c_geo.rotation_matrix_fwd * track.vtx0.pos + c_geo.translation_vector;
-                     track.vtx0.dir = c_geo.rotation_matrix_fwd * track.vtx0.dir;
-                     track.vtx1 = track.vtx0;
+                     current_track.vtx0.pos = c_geo.rotation_matrix_fwd * current_track.vtx0.pos + c_geo.translation_vector;
+                     current_track.vtx0.dir = c_geo.rotation_matrix_fwd * current_track.vtx0.dir;
+                     current_track.vtx1 = current_track.vtx0;
 
                      if (in_geometry) break;
                 }
-                if (!in_geometry || track.vtx1.ke <= 0.0) {
-                    track.stop();
+                if (!in_geometry || current_track.vtx1.ke <= 0.0) {
+                    current_track.stop();
                 }
             }
-        }
+        } while (mc::pop_from_stack(secondary_stack, stack_top, current_track));
 #if defined(__CUDACC__)
         atomicAdd(tracked_particles, 1);
 #else
