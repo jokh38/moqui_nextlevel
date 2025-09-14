@@ -1,0 +1,175 @@
+알겠습니다. 기존 `Rev_plan_F.md` 형식과 내용을 바탕으로, Geant4 데이터 활용 방안을 포함한 상세하고 구체적인 최종 실행 계획 문서를 재작성했습니다.
+
+문서는 AI 코드 어시스턴트가 직접 코드를 구현할 수 있도록 각 단계의 목표, 기술, 수정 대상 파일과 핵심 로직을 명확히 정의합니다. 요청하신 대로 Geant4 데이터 파싱에 대한 설명은 별도의 부록으로 추가했습니다.
+
+---
+
+## **MOQUI Next-Gen GPU Transport Engine: Phase 3 Concrete Physics Implementation Plan**
+
+This document provides a concrete, actionable execution plan for implementing the full physics models within the `Event-by-Event` transport kernel. This plan is based on the data structures and physics lists used by Geant4 (specifically, the `G4PARTICLEXSDATA` dataset format) to ensure physical accuracy and a clear implementation path.
+
+---
+
+### **Sub-Phase 3.1: Geant4-Compliant Physics Data Management**
+
+This phase focuses on creating a data pipeline to process Geant4 cross-section data and load it into a GPU-optimized format.
+
+* **Objective**: Develop a host-side utility to parse Geant4's `G4PARTICLEXSDATA` proton data files and enhance `physics_data_manager` to load this processed data into a unified texture object for efficient GPU access.
+* **Success Metrics**:
+    * **Primary**: A host-side C++ utility successfully reads ASCII files from `G4PARTICLEXSDATA/Proton/Inelastic/CrossSection/` and `.../Elastic/CrossSection/` and serializes them into a custom binary format.
+    * **Secondary**: The `physics_data_manager` loads this binary file, populates a single multi-layered CUDA Array, and correctly calculates `max_sigma`. The texture object now provides access to stopping power, elastic XS, and inelastic XS via different layers.
+* **Key Technology**: **Geant4 Data Formats**, **CUDA 3D Textures**, **Binary File I/O**
+
+#### **1. Target Modules and Files**
+
+| File Path | Class / Function | Description of Changes |
+| :--- | :--- | :--- |
+| `utils/g4_data_parser/` | (New Utility) | Create a new command-line tool to parse Geant4 ASCII data files and convert them into a single binary data package for MOQUI. |
+| `base/mqi_physics_data.hpp` | `physics_data_manager` | Modify member variables to handle a single, layered CUDA array (`cudaArray*`). Remove separate pointers for different cross-sections. |
+| `base/mqi_physics_data.cu` | `physics_data_manager` | Implement logic to load the custom binary data package. Re-implement texture creation to use a `cudaChannelFormatDesc` suitable for multi-layered data (e.g., `float4`) and bind it to a 3D texture. |
+| `data/physics/` | (New Directory) | Add a directory to store the generated binary physics data package (e.g., `proton_physics.bin`). |
+
+#### **2. Key Variables and Logic**
+
+* **Data Structure Definition (in Parser and Manager)**:
+    * Define a clear binary layout:
+        1.  Header: Number of materials, number of energy bins, energy grid info.
+        2.  Material 1 Data Block: [Stopping Power values...], [Elastic XS values...], [Inelastic XS values...]
+        3.  Material 2 Data Block: [...]
+* **Data Consolidation**: The parser will be responsible for interpolating Geant4 data onto a uniform energy grid suitable for texture mapping. The data for each material (Stopping Power, Elastic XS, Inelastic XS) will be packed together.
+* **Unified Texture Object**:
+    * Instead of multiple textures or global memory pointers, a single 2D layered CUDA Array (or a 3D CUDA Array) will be used.
+    * Texture Coordinates:
+        * `u` (x-coordinate): **Energy Index**.
+        * `v` (y-coordinate): **Material Index**.
+        * `w` (z-coordinate / layer): **Physics Process Index** (e.g., 0 for Stopping Power, 1 for Elastic XS, 2 for Inelastic XS).
+* **`max_sigma` Calculation**: This logic remains in `physics_data_manager` but now reads from the newly loaded data structures before uploading them to the GPU.
+
+#### **3. Execution Procedure**
+
+1.  **Develop Parser**: Create the C++ command-line utility. It will take directory paths to Geant4 data as input and produce a single `proton_physics.bin` file.
+2.  **Refactor `physics_data_manager`**:
+    * In the `.cu` file, change the data loading to read the new binary file.
+    * Allocate a `cudaMalloc3DArray` to hold all physics data. The depth of the array corresponds to the number of physics processes.
+    * Update `cudaCreateTextureObject` to use `cudaResourceTypeArray` with the 3D array handle. The texture address mode should be `cudaAddressModeClamp` for energy and material, and the read mode should be `cudaReadModeElementType`.
+3.  **Integrate**: Ensure the `CMakeLists.txt` builds the new parser utility and knows where to find the generated `proton_physics.bin` file.
+
+---
+
+### **Sub-Phase 3.2: Multi-Process Kernel Implementation**
+
+This phase implements the detailed physics logic within the kernel using the new unified texture object.
+
+* **Objective**: Fully implement the discrete interaction sampling and continuous process application within the `transport_event_by_event_kernel` using the multi-layered texture for data access.
+* **Success Metrics**:
+    * **Primary**: The kernel fetches data for multiple physics processes (stopping power, elastic XS, inelastic XS) from a single texture object using 3D coordinates.
+    * **Secondary**: The interaction sampling logic correctly uses the fetched cross-section data to determine the outcome of a step (null-collision, elastic, or inelastic).
+* **Key Technology**: **CUDA Texture Fetching (3D)**, **Monte Carlo Physics Sampling**
+
+#### **1. Target Modules and Files**
+
+| File Path | Class / Function | Description of Changes |
+| :--- | :--- | :--- |
+| `kernel_functions/mqi_transport_event.hpp` | `transport_event_by_event_kernel` | The kernel signature now only needs one texture object (`tex`) and `max_sigma`. All internal physics lookups are changed to `tex3D()` calls. |
+| `kernel_functions/mqi_physics_processes.cuh` | (New File) | Create a header for `__device__` helper functions to keep the main kernel file clean. |
+
+#### **2. Key Variables and Logic**
+
+* **Physics Data Access**:
+    * All data lookups will be replaced by `tex3D()` calls.
+    * `float stopping_power = tex3D<float>(tex, u, v, 0.0f);`
+    * `float elastic_xs = tex3D<float>(tex, u, v, 1.0f);`
+    * `float inelastic_xs = tex3D<float>(tex, u, v, 2.0f);`
+    *(Note: The `w` coordinate is a float from 0 to N-1 for N layers).*
+* **Device Helper Functions** (in `mqi_physics_processes.cuh`):
+    * `__device__ void apply_continuous_processes(track_t* track, ...)`: This function will contain the energy loss calculation and the Multiple Coulomb Scattering logic.
+    * `__device__ int sample_discrete_interaction(cudaTextureObject_t tex, ...)`: This function will fetch elastic and inelastic cross-sections, perform the check against `max_sigma`, and return an enum value indicating the result (`NULL_COLLISION`, `ELASTIC`, `INELASTIC`).
+* **Main Kernel Flow**:
+    1.  Calculate `step_length` using Woodcock tracking.
+    2.  Move the particle: `track.update_post_vertex_position(step_length);`.
+    3.  Apply continuous processes for that step: `apply_continuous_processes(...)`. This updates energy and direction.
+    4.  Check for discrete interaction at the end of the step: `if (dist_to_interaction < dist_to_boundary)`.
+    5.  If so, call `sample_discrete_interaction(...)`.
+    6.  Use a `switch` statement on the result to either do nothing (null), call an elastic scattering final state model, or call an inelastic reaction model.
+
+#### **3. Execution Procedure**
+
+1.  **Create Helper Header**: Create and populate `mqi_physics_processes.cuh` with the function stubs.
+2.  **Implement `apply_continuous_processes`**: Write the device code for energy loss (using `tex3D`) and MCS.
+3.  **Implement `sample_discrete_interaction`**: Write the device code that fetches multiple cross-sections from the texture and performs the probabilistic sampling.
+4.  **Refactor Kernel**: Rework the main loop in `mqi_transport_event.hpp` to follow the new, cleaner flow described above, replacing all old placeholder code.
+
+---
+
+### **Sub-Phase 3.3: Inelastic Final State Model & Stack Activation**
+
+This phase implements a simplified model for what happens after an inelastic nuclear reaction and fully activates the shared memory stack.
+
+* **Objective**: Implement a basic inelastic final state model where a secondary proton is generated. Activate the shared memory stack to manage these secondaries.
+* **Success Metrics**:
+    * **Primary**: When an inelastic event is sampled, the primary particle is terminated, and a new secondary proton (with reduced energy) is correctly pushed onto the shared memory stack.
+    * **Secondary**: Threads correctly pop and transport these secondary particles from the stack, ensuring no particles are lost and the simulation proceeds until the stack is empty.
+* **Key Technology**: **CUDA Atomics**, **Shared Memory Management**
+
+#### **1. Target Modules and Files**
+
+| File Path | Class / Function | Description of Changes |
+| :--- | :--- | :--- |
+| `kernel_functions/mqi_physics_processes.cuh` | `execute_inelastic_reaction(...)` | (New function) Implement the logic to create a secondary proton and push it to the stack. |
+| `kernel_functions/mqi_transport_event.hpp` | `transport_event_by_event_kernel` | Finalize the main loop to include the logic for popping particles from the stack after the current track has finished. |
+
+#### **2. Key Variables and Logic**
+
+* **Inelastic Final State Model** (`execute_inelastic_reaction`):
+    * This is a simplified model for now. A full physics model (like Binary Cascade) is too complex for direct GPU implementation.
+    * **Logic**:
+        1.  The primary proton is stopped: `primary_track->stop();`.
+        2.  Create a new `mqi::track_t secondary;`.
+        3.  The secondary's starting position is the primary's interaction point.
+        4.  The secondary's energy is sampled from a simple distribution (e.g., `primary_energy * curand_uniform(rng)`).
+        5.  The secondary's direction is isotropic (randomly sampled on a sphere).
+        6.  Call a `push_to_stack(...)` device function.
+* **Stack Push/Pop Logic**:
+    * The push/pop logic using `atomicAdd` and `atomicSub` on the `stack_top` index remains as described in the previous plan. This implementation is standard and robust. The key is to integrate it correctly into the main kernel loop.
+* **Main Loop Finalization**:
+    * The kernel loop will be structured as: `do { ... transport current track ... } while (pop_from_stack(&current_track));`
+    * The `pop_from_stack` helper function will contain the `atomicSub` logic and return `true` if a new particle was successfully popped, and `false` if the stack was empty.
+
+#### **3. Execution Procedure**
+
+1.  **Implement `execute_inelastic_reaction`**: Add this new device function to `mqi_physics_processes.cuh` with the simplified secondary generation model.
+2.  **Implement Stack Helpers**: Create `__device__` functions for `push_to_stack` and `pop_from_stack` to encapsulate the atomic operations and bounds checking.
+3.  **Finalize Kernel Loop**: Modify the main loop in `mqi_transport_event.hpp` to correctly call the inelastic final state model and the stack pop logic, ensuring the thread continues working as long as there are particles in the shared stack.
+4.  **Validation**: Perform rigorous testing with `cuda-memcheck` to ensure no race conditions exist. Validate that the total number of particles processed correctly reflects the primary histories plus the generated secondaries.
+
+---
+---
+
+### **Appendix A: Geant4 Data Preparation Workflow**
+
+이 부록은 **Sub-Phase 3.1**에서 필요한 물리 데이터를 준비하는 일회성(one-time) 프로세스를 설명합니다. 이 작업은 MOQUI 시뮬레이션 실행 전에 미리 수행되어야 하며, 그 결과물인 바이너리 데이터 파일은 MOQUI 프로젝트에 포함되어 계속 사용됩니다.
+
+#### **목표**
+
+Geant4가 제공하는 신뢰성 높은 텍스트 기반 물리 데이터를 MOQUI의 GPU 커널이 빠르고 효율적으로 사용할 수 있는 **하나의 최적화된 바이너리 파일**로 변환합니다.
+
+#### **절차**
+
+1.  **데이터 소스 확인 (Geant4)**
+    * **데이터 출처**: 양성자 물리 데이터는 **Geant4 툴킷**과 함께 배포되는 **`G4PARTICLEXSDATA`** 표준 데이터 라이브러리에서 가져옵니다.
+    * **데이터 형식**: 이 라이브러리의 데이터는 **ASCII 텍스트 파일**입니다. 각 파일은 특정 입자(양성자), 특정 원소(산소, 탄소 등), 특정 상호작용(탄성 산란, 비탄성 반응)에 대한 에너지별 단면적 값을 담고 있습니다.
+        * *파일 경로 예시*: `.../G4PARTICLEXSDATA/Proton/Inelastic/CrossSection/8_16_Oxygen`
+        * *파일 내용*: `(에너지 1, 단면적 1), (에너지 2, 단면적 2), ...` 와 같은 데이터 쌍 목록입니다.
+
+2.  **데이터 파서(Parser) 개발**
+    * **목적**: 수많은 Geant4 텍스트 파일을 MOQUI에 최적화된 단일 형식으로 변환하기 위해 **`g4_data_parser`** 라는 별도의 C++ 유틸리티 프로그램을 개발합니다.
+    * **파서의 기능**:
+        1.  **데이터 읽기**: Geant4 데이터 폴더에서 필요한 모든 파일(인체 조직을 구성하는 주요 원소들 - H, C, N, O, P, Ca 등 - 의 탄성/비탄성 단면적 데이터)을 읽습니다.
+        2.  **데이터 정규화 (보간)**: Geant4 데이터의 에너지 격자는 불규칙합니다. GPU 텍스처를 효율적으로 사용하기 위해, 파서는 **선형 보간(linear interpolation)**을 사용하여 원본 데이터를 MOQUI가 사용할 **균일한 에너지 격자**에 맞춰 재구성합니다.
+        3.  **데이터 통합**: 기존에 사용하던 **저지능(Stopping Power) 데이터**와 새로 파싱한 **탄성 단면적(Elastic XS) 데이터**, **비탄성 단면적(Inelastic XS) 데이터**를 하나의 큰 데이터 블록으로 통합합니다.
+        4.  **바이너리 파일 생성**: 가공된 모든 데이터를 `proton_physics.bin`과 같은 **단일 바이너리 파일**로 저장합니다. 이 파일은 명확한 헤더(물질 수, 에너지 격자 정보 등)와 데이터 블록 구조를 가집니다.
+
+3.  **MOQUI 프로젝트에 통합**
+    * 생성된 `proton_physics.bin` 파일을 MOQUI 프로젝트 내의 `data/physics/` 디렉터리로 복사합니다.
+    * 이 파일은 버전 관리 시스템(Git)에 포함되어 모든 개발자가 동일한 물리 데이터를 사용하도록 보장합니다.
+    * `physics_data_manager`는 이제 수많은 텍스트 파일이 아닌 이 단일 바이너리 파일만 로드하여 시뮬레이션을 준비하므로, 초기화 과정이 매우 빠르고 간결해집니다.
