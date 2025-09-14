@@ -425,6 +425,16 @@ physics_data_manager::physics_data_manager() {
     memcpy(host_data.data() + width * 4, cs_po_i_g4_table, width * sizeof(float));
     memcpy(host_data.data() + width * 5, cs_pp_e_g4_table, width * sizeof(float));
 
+    // Calculate max_sigma for Woodcock tracking
+    max_sigma_ = 0.0f;
+    for (int i = 0; i < width; ++i) {
+        float total_cs = cs_p_ion_table[i] + cs_po_e_g4_table[i] + cs_po_i_g4_table[i] +
+                         cs_pp_e_g4_table[i];
+        if (total_cs > max_sigma_) {
+            max_sigma_ = total_cs;
+        }
+    }
+
     // Create CUDA array
     cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<float>();
     CUDA_CHECK(cudaMallocArray(&cu_array_, &channelDesc, width, height));

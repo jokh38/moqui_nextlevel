@@ -23,6 +23,12 @@
 namespace mqi
 {
 
+///< Transport model enum for selecting the physics transport kernel
+enum class transport_model {
+    CONDENSED_HISTORY,
+    EVENT_BY_EVENT
+};
+
 /// \class treatment_session
 /// \tparam T type of phase-space variables
 /// Reads RT-Ion file, creates treatment_machine,

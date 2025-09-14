@@ -37,6 +37,7 @@
 #include <moqui/base/mqi_threads.hpp>
 #include <moqui/base/mqi_treatment_session.hpp>
 #include <moqui/base/scorers/mqi_scorer_energy_deposit.hpp>
+#include "kernel_functions/mqi_transport_event.hpp"
 #include <valarray>
 #include <thrust/sort.h>
 #include <thrust/device_ptr.h>
@@ -101,6 +102,7 @@ public:
     std::string   source_type    = "FluenceMap";
     /// Simulation parameters
     mqi::sim_type_t            sim_type;
+    mqi::transport_model       transport_model_;
     std::vector<int>           beam_numbers;
     std::string                parent_dir = "";
     std::string                dicom_dir  = "";
@@ -228,6 +230,12 @@ public:
         /// Source parameters
         source_type = parser.get_string("SourceType", "FluenceMap");
         sim_type    = parser.string_to_sim_type(parser.get_string("SimulationType", "perBeam"));
+        std::string transport_model_str = parser.get_string("TransportModel", "CondensedHistory");
+        if (transport_model_str == "EventByEvent") {
+            transport_model_ = mqi::transport_model::EVENT_BY_EVENT;
+        } else {
+            transport_model_ = mqi::transport_model::CONDENSED_HISTORY;
+        }
         particles_per_history = parser.get_float("ParticlesPerHistory", -1.0);
 
         // -------------------------------------------------------------------------------------------
@@ -1260,9 +1268,20 @@ public:
                                cudaMemcpyHostToDevice));
         printf("Starting transportation call.. \n");
         printf("Printing simulation specification.. : Histories per batch --> %d\n", histories_per_batch);
-        mc::transport_particles_patient<R><<<n_blocks, n_threads>>>(
-          tx->physics_data_manager_->get_texture_object(),
-          worker_threads, mc::mc_world, d_tracks, histories_in_batch, d_tracked_particles);
+        switch (transport_model_) {
+            case mqi::transport_model::EVENT_BY_EVENT:
+                mc::transport_event_by_event_kernel<R><<<n_blocks, n_threads>>>(
+                  tx->physics_data_manager_->get_texture_object(),
+                  tx->physics_data_manager_->get_max_sigma(),
+                  worker_threads, mc::mc_world, d_tracks, histories_in_batch, d_tracked_particles, d_scorer_offset_vector);
+                break;
+            case mqi::transport_model::CONDENSED_HISTORY:
+            default:
+                mc::transport_particles_patient<R><<<n_blocks, n_threads>>>(
+                  tx->physics_data_manager_->get_texture_object(),
+                  worker_threads, mc::mc_world, d_tracks, histories_in_batch, d_tracked_particles, d_scorer_offset_vector);
+                break;
+        }
         cudaDeviceSynchronize();
         check_cuda_last_error("(transport particle table)");
 

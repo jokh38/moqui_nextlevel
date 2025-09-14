@@ -23,12 +23,21 @@ public:
         return tex_object_;
     }
 
+    /// Returns the maximum total cross-section.
+    float
+    get_max_sigma() const {
+        return max_sigma_;
+    }
+
 private:
     /// The CUDA texture object for physics data.
     cudaTextureObject_t tex_object_ = 0;
 
     /// The CUDA array storing the physics data on the GPU.
     cudaArray* cu_array_ = nullptr;
+
+    /// The maximum total cross-section for Woodcock tracking.
+    float max_sigma_ = 0.0f;
 };
 
 }   // namespace mqi
