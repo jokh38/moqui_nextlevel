@@ -4,6 +4,7 @@
 #include <moqui/base/mqi_track.hpp>
 #include <moqui/base/mqi_track_stack.hpp>
 #include <moqui/base/mqi_node.hpp>
+#include <moqui/kernel_functions/mqi_physics_processes.cuh>
 #include <moqui/base/mqi_threads.hpp>
 #include <moqui/base/mqi_physics_constants.hpp>
 #include <moqui/base/mqi_error_check.hpp>
@@ -72,20 +73,20 @@ transport_event_by_event_kernel(cudaTextureObject_t tex,
                         mqi::cnb_t cnb = c_geo.ijk2cnb(c_geo.index(track.vtx0.pos));
                         R rho_mass = c_geo[cnb];
 
-                        // Woodcock Tracking
+                        // Woodcock Tracking: sample distance to next potential interaction site
                         R random_val = curand_uniform(thread_rng);
                         R dist_to_interaction = -log(random_val) / max_sigma;
 
+                        // Find distance to the boundary of the current geometry voxel
                         mqi::intersect_t<R> its = c_geo.intersect(track.vtx0.pos, track.vtx0.dir);
                         R dist_to_boundary = its.dist;
 
+                        // The step length is the minimum of the two distances
                         R step_length = min(dist_to_interaction, dist_to_boundary);
                         track.update_post_vertex_position(step_length);
 
-                        // Energy loss over the step (simplified)
-                        R energy_loss = step_length * rho_mass * 2.0; // Simplified dE/dx
-                        track.update_post_vertex_energy(energy_loss);
-                        track.deposit(energy_loss);
+                        // Apply continuous processes (energy loss) over the step
+                        mc::apply_continuous_processes(&track, step_length, rho_mass, tex, c_ind);
 
                         // Scoring
                         for (uint8_t s = 0; s < track.c_node->n_scorers; ++s) {
@@ -100,14 +101,25 @@ transport_event_by_event_kernel(cudaTextureObject_t tex,
                             }
                         }
 
-                        // Null-collision event
+                        // If the step ended on an interaction site, sample the interaction
                         if (dist_to_interaction < dist_to_boundary) {
-                            R total_cs_at_energy = tex2D<float>(tex, track.vtx1.ke, 0); // Simplified lookup
-                            if (curand_uniform(thread_rng) < total_cs_at_energy / max_sigma) {
-                                // Real interaction occurred
-                                // In a full implementation, determine which interaction and generate secondaries.
-                                // For now, we just stop the particle to simulate an interaction.
-                                track.stop();
+                            mc::interaction_type_t interaction = mc::sample_discrete_interaction(
+                                tex, track.vtx1.ke, c_ind, max_sigma, thread_rng);
+
+                            switch (interaction) {
+                                case mc::ELASTIC:
+                                    // Final state model for elastic scattering would be called here.
+                                    // For now, stop the particle as a placeholder.
+                                    track.stop();
+                                    break;
+                                case mc::INELASTIC:
+                                    // Final state model for inelastic reaction would be called here.
+                                    // For now, stop the particle as a placeholder.
+                                    track.stop();
+                                    break;
+                                case mc::NULL_COLLISION:
+                                    // Do nothing, continue tracking
+                                    break;
                             }
                         }
 
