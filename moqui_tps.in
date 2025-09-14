@@ -1,0 +1,61 @@
+
+## Global parameters for simulation
+
+GPUID 2 # 0-9 number
+RandomSeed -1932780356 # (integer, use negative value if use current time)
+UseAbsolutePath false
+TotalThreads -1 #(Integer, use negative value for using optimized number of threads)
+MaxHistoriesPerBatch 600000000
+Verbosity 0
+
+## Data directories
+ParentDir data/E070_E134_1 # parent directory of DICOM files
+DicomDir plan # directory of the DICOM
+logFilePath log
+
+# Gantry number selection
+GantryNum 1
+
+## Phantom geometry in patient plan calculation by Chanil Jeon
+## Phantom Dim ==> Pixel count of XYZ
+## Phantom Unit ==> mm
+## Phantom Position ==> Basic position is phantom center (-200, -200, -200)
+## Y is the depth position in DICOM
+
+## If you use phantom geometry, set true
+UsingPhantomGeo true
+
+## While you use phantom geometry, program with two centimeter mode can get exact 2 cm position slice dose 
+TwoCentimeterMode false
+
+## Phantom information. Two centimeter mode overrides this setting (no effect).
+PhantomDimX 180
+PhantomDimY 180
+PhantomDimZ 400
+PhantomUnitX 1
+PhantomUnitY 1
+PhantomUnitZ 1
+PhantomPositionX -90.0
+PhantomPositionY -90.0
+PhantomPositionZ -380.0
+
+## Quantity to score
+Scorer Dose # Dose is dose to water. We support dose to medium, dose to water, track-weighted LET, dose-weighted LET. Modification in environment is needed to add selection
+SupressStd true
+ReadStructure true
+ROIName External
+
+## Source parameters
+SourceType FluenceMap
+SimulationType perBeam
+BeamNumbers 0
+ParticlesPerHistory 1 # Scale factor to select the number of primary particles
+
+## Not implemented yet
+ScoreToCTGrid true
+
+## Output path
+OutputDir Output/E070_E134_1_3090 # output directory
+OutputFormat raw # output format (raw, mhd, mha, npz)
+OverwriteResults true
+
