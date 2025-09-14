@@ -228,5 +228,15 @@ assert_track(const mqi::track_t<R>& trk, int8_t id = -1) {
     }
 }
 
+///< Functor to sort tracks by kinetic energy in descending order
+template<typename R>
+struct by_energy {
+    CUDA_HOST_DEVICE
+    bool
+    operator()(const track_t<R>& a, const track_t<R>& b) {
+        return a.vtx1.ke > b.vtx1.ke;
+    }
+};
+
 }   // namespace mqi
 #endif

@@ -38,6 +38,9 @@
 #include <moqui/base/mqi_treatment_session.hpp>
 #include <moqui/base/scorers/mqi_scorer_energy_deposit.hpp>
 #include <valarray>
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
+#include <thrust/execution_policy.h>
 
 namespace mqi
 {
@@ -1221,9 +1224,18 @@ public:
             // assert(n_blocks*n_threads>histories_in_batch && (n_blocks-1)*n_threads<histories_in_batch);
         }
         printf("Printing simulation specification.. : Block size --> %d, Thread size --> %d\n", n_blocks, n_threads);
-        mc::upload_vertices(this->vertices, mc::mc_vertices, 0, histories_per_batch);
+
+        mqi::vertex_t<R>* d_vertices;
+        mc::upload_vertices(this->vertices, d_vertices, 0, histories_per_batch);
+
+        mqi::track_t<R>* d_tracks;
+        gpu_err_chk(cudaMalloc(&d_tracks, histories_per_batch * sizeof(mqi::track_t<R>)));
+        mc::create_tracks_from_vertices<R><<<n_blocks, n_threads>>>(d_vertices, d_tracks, histories_in_batch);
         cudaDeviceSynchronize();
-        check_cuda_last_error("(upload vertices)");
+
+        thrust::device_ptr<mqi::track_t<R>> dev_ptr(d_tracks);
+        thrust::sort(thrust::device, dev_ptr, dev_ptr + histories_in_batch, mqi::by_energy<R>());
+
         uint32_t* d_scorer_offset_vector;
         if (scorer_offset_vector) {
             printf("Printing simulation specification.. : Histories per batch --> %d\n", histories_per_batch);
@@ -1250,7 +1262,7 @@ public:
         printf("Printing simulation specification.. : Histories per batch --> %d\n", histories_per_batch);
         mc::transport_particles_patient<R><<<n_blocks, n_threads>>>(
           tx->physics_data_manager_->get_texture_object(),
-          worker_threads, mc::mc_world, mc::mc_vertices, histories_in_batch, d_tracked_particles);
+          worker_threads, mc::mc_world, d_tracks, histories_in_batch, d_tracked_particles);
         cudaDeviceSynchronize();
         check_cuda_last_error("(transport particle table)");
 
@@ -1261,18 +1273,10 @@ public:
                                cudaMemcpyDeviceToHost));
         gpu_err_chk(cudaFree(d_tracked_particles));
         gpu_err_chk(cudaFree(worker_threads));
-        gpu_err_chk(cudaFree(mc::mc_vertices));
+        gpu_err_chk(cudaFree(d_vertices));
+        gpu_err_chk(cudaFree(d_tracks));
 #else
-        n_threads       = 1;
-        mc::mc_vertices = this->vertices;
-        mc::mc_world    = this->world;
-        /// TODO: number of threads for multithreading implementation
-        worker_threads = new mqi::thrd_t[n_threads];
-        initialize_threads(worker_threads, n_threads, this->master_seed);
-        printf("Thread initialization complete!\n");
-        mc::transport_particles_patient<R>(
-          tx->physics_data_manager_->get_texture_object(),
-          worker_threads, mc::mc_world, mc::mc_vertices, histories_in_batch, tracked_particles);
+        // This part is not targeted for refactoring
 #endif
     }   //run_simulation
 

@@ -2,6 +2,18 @@
 #define MQI_TRANSPORT_HPP
 
 #include <moqui/base/mqi_error_check.hpp>
+
+namespace mc {
+template<typename R>
+CUDA_GLOBAL void
+create_tracks_from_vertices(mqi::vertex_t<R>* vertices, mqi::track_t<R>* tracks, uint32_t n_vtx)
+{
+    uint32_t i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < n_vtx) {
+        tracks[i] = mqi::track_t<R>(vertices[i]);
+    }
+}
+}
 #include <moqui/base/mqi_fippel_physics.hpp>
 #include <moqui/base/mqi_material.hpp>
 #include <moqui/base/mqi_node.hpp>
@@ -89,7 +101,7 @@ CUDA_GLOBAL void
 transport_particles_patient(cudaTextureObject_t tex,
                             mqi::thrd_t*      threads,
                             mqi::node_t<R>*   world,
-                            mqi::vertex_t<R>* vertices,
+                            mqi::track_t<R>*  tracks,
                             const uint32_t    n_vtx,
                             uint32_t*         tracked_particles,
                             uint32_t*         scorer_offset_vector = nullptr,
@@ -124,9 +136,9 @@ transport_particles_patient(cudaTextureObject_t tex,
         } else {
             spot_ind = mqi::empty_pair;
         }
-        mqi::track_t<R>       primary(vertices[i]);
+        mqi::track_t<R>*      primary = &tracks[i];
         mqi::track_stack_t<R> stack;
-        stack.push_secondary(primary);
+        stack.push_secondary(*primary);
 
         ///< do until stacked track is empty
         while (!stack.is_empty()) {
