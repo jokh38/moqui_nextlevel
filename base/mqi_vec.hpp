@@ -275,11 +275,7 @@ public:
     CUDA_HOST_DEVICE
     void
     dump() const {
-#if defined(__CUDACC__)
         printf("(x, y, z) -> (%f, %f, %f)\n", x, y, z);
-#else
-        std::cout << "(x, y, z) -> (" << x << ", " << y << ", " << z << ") " << std::endl;
-#endif
     }
 };
 

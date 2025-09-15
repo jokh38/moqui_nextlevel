@@ -23,7 +23,7 @@ public:
     /// Constructor to copy mean and sigma and initialize uniform_distributions
     /// In this pdf, mean[0] and sigma[0] will be used for ranges
     /// e.g., a random variable will be sampled from mean[0] and sigma[0]
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     uni_1d(
         std::array<T,1>& m, 
         std::array<T,1>& s) 
@@ -35,7 +35,7 @@ public:
     }
     
     /// Constructor to copy mean and sigma and initialize uniform_distributions
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     uni_1d(
         const std::array<T,1>& m, 
         const std::array<T,1>& s)
@@ -47,7 +47,7 @@ public:
     }
 
     /// Returns value sampled from 1-d uniform distribution
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual 
     std::array<T,1>
     operator()(std::default_random_engine* rng){

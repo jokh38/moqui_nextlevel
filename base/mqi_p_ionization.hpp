@@ -46,7 +46,7 @@ public:
     }
 
     ///< dEdx
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual inline R
     dEdx(const relativistic_quantities<R>& rel, const material_t<R>& mat) {
         R pw = 0;
@@ -62,7 +62,7 @@ public:
     }
 
     ///< sample delta-energy
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     inline R
     sample_delta_energy(const R Te_max, const mqi_rng* rng) {
         R eta = mqi_uniform<R>(rng);
@@ -70,7 +70,7 @@ public:
     }
 
     ///< Energy loss (positive)
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual inline R
     energy_loss(const relativistic_quantities<R>& rel,
                 material_t<R>&                    mat,
@@ -112,7 +112,7 @@ public:
     }
 
     ///< energy_straggling variance
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     inline R
     energy_straggling(const relativistic_quantities<R>& rel,
                       const material_t<R>&              mat,
@@ -127,7 +127,7 @@ public:
     ///< TODO: this better to be in material
     /// rho_mass (g/mm^3)
     /// From M. Fippel and M. Soukup, Med. Phys. Vol. 31, No. 8, 2004
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual R
     radiation_length(R density) {
         R radiation_length_mat = 0.0;
@@ -149,7 +149,7 @@ public:
     }
 
     ///< CSDA method is special to p_ionization
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     along_step(track_t<R>&       trk,
                track_stack_t<R>& stk,
@@ -221,7 +221,7 @@ public:
 
     ///< DoIt method to update track's KE, pos, dir, dE, status
     ///< compute energy loss, vertex, secondaries
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     post_step(track_t<R>&       trk,
               track_stack_t<R>& stk,
@@ -274,7 +274,7 @@ public:
 
     ///< DoIt method to update track's KE, pos, dir, dE, status
     ///< compute energy loss, vertex, secondaries
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     last_step(track_t<R>& trk, material_t<R>& mat) {
         mqi::relativistic_quantities<R> rel(trk.vtx0.ke, this->units.Mp);

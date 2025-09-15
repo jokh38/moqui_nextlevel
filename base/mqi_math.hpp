@@ -22,6 +22,7 @@ const float geometry_tolerance = 1e-3;
 ///< TODO: CUDA m_inf
 const float m_inf = -1.0 * HUGE_VALF;
 const float p_inf = HUGE_VALF;
+const float PI    = M_PI;
 
 template<typename T>
 CUDA_DEVICE inline T

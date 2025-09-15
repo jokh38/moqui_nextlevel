@@ -72,7 +72,7 @@ public:
     /// Construct a rectlinear grid from vectors of x/y/z
     /// \param x,y,z  1D vector of central points of voxels along x-axis
     /// for example, -1,0,1 mean three voxels along x.
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     rect3d(std::vector<R>& x, std::vector<R>& y, std::vector<R>& z) {
         x_ = new R[x.size()];
         y_ = new R[y.size()];
@@ -93,7 +93,7 @@ public:
     /// Construct a rectlinear grid from array of x/y/z with their size
     /// \param x,y,z  1D array of central points of voxels along x-axis
     /// \param xn,yn,zn  size of 1D array for points.
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     rect3d(R x[], int xn, R y[], int yn, R z[], int zn) {
         x_ = new R[xn];
         y_ = new R[yn];
@@ -112,7 +112,7 @@ public:
     }
 
     /// Copy constructor
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     rect3d(rect3d& c) {
         dim_ = c.dim_;
 
@@ -129,7 +129,7 @@ public:
     }
 
     /// Destructor releases dynamic allocation for x/y/z coordinates
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     ~rect3d() {
         delete x_;
         delete y_;
@@ -299,6 +299,7 @@ public:
     /// Returns a coner index of z
     /// \param pos cartesian coordinate of z
     /// \return z index of a cell
+    CUDA_HOST
     inline virtual size_t
     find_c000_z_index(const R& z) {
         R* k = std::lower_bound(z_, z_ + dim_.z, z, std::less_equal<R>());
