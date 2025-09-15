@@ -246,7 +246,7 @@ public:
     ~po_elastic_tabulated() {
     }
 
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual R
     cross_section(const relativistic_quantities<R>& rel, const material_t<R>& mat) {
         R cs = 0;
