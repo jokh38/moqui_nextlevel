@@ -77,7 +77,7 @@ class po_elastic : public interaction<R, mqi::PROTON>
 {
 public:
 public:
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual R
     cross_section(const relativistic_quantities<R>& rel, const material_t<R>& mat) {
         R cs = 0;
