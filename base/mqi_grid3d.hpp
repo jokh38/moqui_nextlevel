@@ -887,6 +887,46 @@ public:
 
         return true;
     }
+
+    ///< check if the point is inside the grid
+    CUDA_HOST_DEVICE
+    inline bool
+    is_inside(const mqi::vec3<R>& p) {
+        return (p.x >= xe_[0] && p.x <= xe_[dim_.x] && p.y >= ye_[0] && p.y <= ye_[dim_.y] &&
+                p.z >= ze_[0] && p.z <= ze_[dim_.z]);
+    }
+
+    CUDA_HOST_DEVICE
+    inline mqi::vec3<ijk_t>
+    index(const mqi::vec3<R>& p)   // if p is on boundary
+    {   //find index for the first intersection, return voxel index
+        mqi::vec3<ijk_t> idx;
+        idx.x = -1;
+        idx.y = -1;
+        idx.z = -1;
+
+        for (int ind = 0; ind < dim_.x; ind++) {
+            if (xe_[ind] <= p.x && xe_[ind + 1] >= p.x) {
+                idx.x = ind;
+                break;
+            }
+        }
+
+        for (int ind = 0; ind < dim_.y; ind++) {
+            if (ye_[ind] <= p.y && ye_[ind + 1] >= p.y) {
+                idx.y = ind;
+                break;
+            }
+        }
+
+        for (int ind = 0; ind < dim_.z; ind++) {
+            if (ze_[ind] <= p.z && ze_[ind + 1] >= p.z) {
+                idx.z = ind;
+                break;
+            }
+        }
+        return idx;
+    }
 };
 
 }   // namespace mqi

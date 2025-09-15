@@ -6,6 +6,11 @@
 #include <moqui/base/mqi_error_check.hpp>
 #include <moqui/base/mqi_math.hpp> // For mqi::PI
 
+namespace mqi {
+///< PI constant
+constexpr float PI = 3.14159265358979323846f;
+}
+
 namespace mc
 {
 

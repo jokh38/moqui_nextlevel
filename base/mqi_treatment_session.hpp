@@ -53,10 +53,9 @@ protected:
     ///< top level DICOM dataset, either RTIP or RTIBTR
     mqi::dataset* mqi_ds_ = nullptr;
 
+public:
     ///< Physics data manager
     std::unique_ptr<mqi::physics_data_manager> physics_data_manager_;
-
-public:
     mqi::patient_material_t<T> material_;
 
     /// Constructs treatment machine based on DICOM or specific file name.
