@@ -54,7 +54,7 @@ public:
     }
 
     ///< step length
-    CUDA_DEVICE
+    CUDA_HOST_DEVICE
     virtual void
     stepping(track_t<R>&       trk,
              track_stack_t<R>& stk,

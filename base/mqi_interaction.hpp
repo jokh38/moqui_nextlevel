@@ -66,7 +66,7 @@ public:
 
     ///< Return cross-section of the process in mm unit
     ///< pure virtual method so that a child needs to fill
-    CUDA_DEVICE
+    CUDA_HOST_DEVICE
     virtual R
     cross_section(const relativistic_quantities<R>& rel, const material_t<R>& mat) = 0;
 
