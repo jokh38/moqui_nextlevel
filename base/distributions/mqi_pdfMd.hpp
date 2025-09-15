@@ -37,7 +37,7 @@ protected:
 public:
 
     /// Constructor to fill mean_ and sigma_ 
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     pdf_Md(
         std::array<T,M>& m, 
         std::array<T,M>& s)
@@ -49,7 +49,7 @@ public:
     }
 
     /// Constructor to fill const mean_ and const sigma_ 
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     pdf_Md(
         const std::array<T,M>& m, 
         const std::array<T,M> &s)
@@ -61,7 +61,7 @@ public:
     }
     
     /// Prints out means and sigmas
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     void 
     dump(){
         for(size_t i=0 ; i < M ; ++i)
@@ -69,12 +69,12 @@ public:
     }
     
     /// Destructor
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     ~pdf_Md(){;}
 
 
     /// '()' operator overloading to act like a function. 
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual 
     std::array<T,M>
     operator()(std::default_random_engine* rng) = 0;

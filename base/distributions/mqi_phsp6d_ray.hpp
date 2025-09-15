@@ -37,7 +37,7 @@ public:
     /// \param r[1] : y, yp correlation
     /// \note seed setup needs to be done by public method
     /// gen_.seed(from outside, topas or UI); //Ideally set from TOPAS?
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     phsp_6d_ray(std::array<T, 6>& m,
                 std::array<T, 6>& s,
                 std::array<T, 2>& r,
@@ -53,7 +53,7 @@ public:
     }
 
     /// Constructor to initializes mean, sigma, rho, and random engine
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     phsp_6d_ray(const std::array<T, 6>& m,
                 const std::array<T, 6>& s,
                 const std::array<T, 6>& r,
@@ -69,7 +69,7 @@ public:
     }
 
     /// Sample 6 phase-space variables and returns
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual std::array<T, 6>
     operator()(std::default_random_engine* rng) {
         std::array<T, 6> phsp = pdf_Md<T, 6>::mean_;

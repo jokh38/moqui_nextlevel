@@ -98,7 +98,7 @@ public:
         return k % (this->max_capacity_ - 1);
     }
 
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     uint32_t
     CAS(uint32_t* address, uint32_t compare, uint32_t val) {
         uint32_t old = *address;

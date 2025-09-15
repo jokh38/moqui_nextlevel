@@ -35,7 +35,7 @@ public:
     std::uniform_real_distribution<T> unify_;
 
     /// Constructor to initialize distribution parameters
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     phsp_6d_fanbeam(
         std::array<T,6>& m,  ///< [x_min, x_max, y_min, y_max, z_min, z_max] 
         std::array<T,6>& s,  ///< [sig_x, sig_y, sig_z, sig_x', sig_y', sig_z']
@@ -54,7 +54,7 @@ public:
     }
     
     /// Constructor to initialize distribution parameters
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     phsp_6d_fanbeam(
 	    const std::array<T,6>& m,  ///< [x_min, x_max, y_min, y_max, z_min, z_max]     
         const std::array<T,6>& s,  ///< [sig_x, sig_y, sig_z, sig_x', sig_y', sig_z']
@@ -74,7 +74,7 @@ public:
 
     /// Constructor to initialize distribution parameters
     /// phase-space variables are sampled same in phsp_6d but they are spread along x and y.
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual 
     std::array<T,6>
     operator()(std::default_random_engine* rng)

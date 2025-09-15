@@ -23,7 +23,7 @@ public:
     std::normal_distribution<T> func_; ///< C++ distribution function
 
     /// Constructor to copy mean and sigma and initialize normal_distributions
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     norm_1d(
         std::array<T,1>& m,
         std::array<T,1>& s)
@@ -36,7 +36,7 @@ public:
     }
 
     /// Constructor to copy mean and sigma
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     norm_1d(
         const std::array<T,1>& m,
         const std::array<T,1> &s)
@@ -48,7 +48,7 @@ public:
     }
 
     /// Returns value sampled from normal distribution
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual
     std::array<T,1>
     operator()(std::default_random_engine* rng){

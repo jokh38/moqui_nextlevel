@@ -33,7 +33,7 @@ class const_1d : public pdf_Md<T,1> {
 public:
 
     /// Constructor
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     const_1d(
         std::array<T,1>& m,
         std::array<T,1>& s)
@@ -41,7 +41,7 @@ public:
     {;}
 
     /// Constructor
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     const_1d(
         const std::array<T,1>& m,
         const std::array<T,1> &s)
@@ -49,7 +49,7 @@ public:
     {;}
 
     /// Returns mean_
-    CUDA_HOST_DEVICE
+    CUDA_HOST
     virtual
     std::array<T,1>
     operator()(std::default_random_engine* rng){

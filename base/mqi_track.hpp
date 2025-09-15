@@ -199,6 +199,7 @@ public:
 template<typename R>
 CUDA_HOST_DEVICE void
 assert_track(const mqi::track_t<R>& trk, int8_t id = -1) {
+#if !defined(__CUDACC__)
     if (mqi::mqi_isnan(trk.vtx1.dir.x) || mqi::mqi_isnan(trk.vtx1.dir.y) ||
         mqi::mqi_isnan(trk.vtx1.dir.z)) {
         printf("id: %d\n", id);
@@ -226,6 +227,7 @@ assert_track(const mqi::track_t<R>& trk, int8_t id = -1) {
         printf("There is all-zeros in track direction\n");
         exit(1);
     }
+#endif
 }
 
 ///< Functor to sort tracks by kinetic energy in descending order

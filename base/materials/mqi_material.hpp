@@ -105,7 +105,7 @@ public:
     }
 
     ///< variable density
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual R
     radiation_length() {
         R radiation_length_mat = 0.0;
