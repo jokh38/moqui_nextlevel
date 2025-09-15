@@ -155,11 +155,15 @@ public:
     cross_section(const relativistic_quantities<R>& rel, const material_t<R>& mat) {
         R cs = 0;
 
+#ifdef __CUDA_ARCH__
         if (rel.Ek >= Ek_min && rel.Ek <= Ek_max) {
             float u = (rel.Ek - Ek_min) / dEk + 0.5f;
-            cs = tex2D<float>(tex_, u, 4.5f);
+            cs      = tex2D<float>(tex_, u, 4.5f);
         }
         cs *= mat.rho_mass;
+#else
+        cs = po_inelastic<R>::cross_section(rel, mat);
+#endif
         return cs;
     }
 
