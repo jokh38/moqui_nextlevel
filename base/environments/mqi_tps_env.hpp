@@ -37,7 +37,7 @@
 #include <moqui/base/mqi_threads.hpp>
 #include <moqui/base/mqi_treatment_session.hpp>
 #include <moqui/base/scorers/mqi_scorer_energy_deposit.hpp>
-#include "kernel_functions/mqi_transport_event.hpp"
+#include <moqui/kernel_functions/mqi_transport_event.hpp>
 #include <valarray>
 #include <thrust/sort.h>
 #include <thrust/device_ptr.h>
