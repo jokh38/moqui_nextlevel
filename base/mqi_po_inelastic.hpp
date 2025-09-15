@@ -104,7 +104,7 @@ public:
         return cs;
     }
 
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     along_step(track_t<R>&       trk,
                track_stack_t<R>& stk,
@@ -164,7 +164,7 @@ public:
     }
 
     ///< Post-step method to update track's KE, pos, dir, dE, status
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     post_step(track_t<R>&       trk,
               track_stack_t<R>& stk,

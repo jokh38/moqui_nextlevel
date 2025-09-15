@@ -94,7 +94,7 @@ public:
 
     ///< DoIt method to update track's KE, pos, dir, dE, status
     ///< compute energy loss, vertex, secondaries
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     along_step(track_t<R>&       trk,
                track_stack_t<R>& stk,
@@ -106,7 +106,7 @@ public:
 
     ///< DoIt method to update track's KE, pos, dir, dE, status
     ///< compute energy loss, vertex, secondaries
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     post_step(track_t<R>&       trk,
               track_stack_t<R>& stk,

@@ -72,7 +72,7 @@ public:
 
     ///< Update track during a given step
     ///< e.g., this is usually for CSDA energy loss
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     along_step(track_t<R>&       trk,
                track_stack_t<R>& stk,
@@ -83,7 +83,7 @@ public:
     ///< Update track at the end of step
     ///< e.g., push secondaries to the stack
     ///        update track status, e.g., created, stopped
-    CUDA_HOST_DEVICE
+    CUDA_DEVICE
     virtual void
     post_step(track_t<R>&       trk,
               track_stack_t<R>& stk,
