@@ -17,7 +17,7 @@ set(GPU ON)
 
 # setting Cuda 11.7 
 set(CMAKE_CUDA_COMPILER /usr/local/cuda-11.7/bin/nvcc CACHE FILEPATH "CUDA 11.7 nvcc" FORCE)
-set(CUDATOOLkit_ROOT /usr/local/cuda-11.7 CACHE PATH "CUDA 11.7 root" FORCE)
+set(CUDAToolkit_ROOT /usr/local/cuda-11.7 CACHE PATH "CUDA 11.7 root" FORCE)
 set(MOQUI_DIR ../moqui)
 add_executable(tps_env tps_env.cpp)
 
